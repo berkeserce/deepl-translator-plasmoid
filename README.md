@@ -57,4 +57,4 @@ your personal Plasma config files to this repository.
 
 ## License
 
-GPL-3.0-or-later. See [LICENSE](LICENSE).
+GPL-3.0-or-later. See [LICENSE](LICENSE)
