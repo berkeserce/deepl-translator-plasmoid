@@ -100,6 +100,16 @@ PlasmoidItem {
         return index >= 0 ? index : fallbackIndex;
     }
 
+    function copyTranslation(textArea) {
+        if (translatedText.length === 0)
+            return ;
+
+        textArea.forceActiveFocus();
+        textArea.selectAll();
+        textArea.copy();
+        statusText = i18n("Copied");
+    }
+
     function translate(text, sourceLanguage, targetLanguage) {
         const apiKey = plasmoid.configuration.apiKey;
         const apiHost = plasmoid.configuration.apiHost || "https://api-free.deepl.com";
@@ -270,10 +280,7 @@ PlasmoidItem {
                     icon.name: "edit-copy"
                     enabled: root.translatedText.length > 0
                     text: i18n("Copy")
-                    onClicked: {
-                        outputText.selectAll();
-                        outputText.copy();
-                    }
+                    onClicked: root.copyTranslation(outputText)
                 }
 
             }
