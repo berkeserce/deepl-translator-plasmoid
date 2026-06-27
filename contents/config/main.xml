@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<kcfg xmlns="http://www.kde.org/standards/kcfg/1.0"
+      xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+      xsi:schemaLocation="http://www.kde.org/standards/kcfg/1.0
+      https://www.kde.org/standards/kcfg/1.0/kcfg.xsd">
+  <kcfgfile name=""/>
+  <group name="General">
+    <entry name="apiKey" type="String">
+      <default></default>
+    </entry>
+    <entry name="apiHost" type="String">
+      <default>https://api-free.deepl.com</default>
+    </entry>
+    <entry name="targetLang" type="String">
+      <default>EN-US</default>
+    </entry>
+    <entry name="sourceLang" type="String">
+      <default></default>
+    </entry>
+  </group>
+</kcfg>

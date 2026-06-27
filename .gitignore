@@ -1,0 +1,16 @@
+# Local editor/project files
+.idea/
+.vscode/
+*.kdev4
+
+# Build/package output
+build/
+dist/
+*.plasmoid
+*.zip
+*.tar.gz
+
+# Logs and temporary files
+*.log
+*.tmp
+*~
