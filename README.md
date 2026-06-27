@@ -52,6 +52,10 @@ plasmashell > /dev/null 2>&1 & disown
 Open the widget settings and enter your DeepL API key. Use the Free endpoint
 for DeepL API Free accounts and the Pro endpoint for paid API accounts.
 
+Set default source and target languages in the widget settings. The translator
+popup lets you override both languages for each translation. Choose **Auto
+detect** as the source language to let DeepL detect the input language.
+
 The API key is stored in the widget's local Plasma configuration. Do not commit
 your personal Plasma config files to this repository.
 
