@@ -11,11 +11,99 @@ PlasmoidItem {
     property bool busy: false
     property string statusText: ""
     property string translatedText: ""
+    property var sourceLanguages: [{
+        "text": i18n("Auto detect"),
+        "value": ""
+    }, {
+        "text": "TR",
+        "value": "TR"
+    }, {
+        "text": "EN",
+        "value": "EN"
+    }, {
+        "text": "DE",
+        "value": "DE"
+    }, {
+        "text": "FR",
+        "value": "FR"
+    }, {
+        "text": "ES",
+        "value": "ES"
+    }, {
+        "text": "IT",
+        "value": "IT"
+    }, {
+        "text": "NL",
+        "value": "NL"
+    }, {
+        "text": "PL",
+        "value": "PL"
+    }, {
+        "text": "PT",
+        "value": "PT"
+    }, {
+        "text": "RU",
+        "value": "RU"
+    }, {
+        "text": "JA",
+        "value": "JA"
+    }, {
+        "text": "ZH",
+        "value": "ZH"
+    }]
+    property var targetLanguages: [{
+        "text": "EN-US",
+        "value": "EN-US"
+    }, {
+        "text": "EN-GB",
+        "value": "EN-GB"
+    }, {
+        "text": "TR",
+        "value": "TR"
+    }, {
+        "text": "DE",
+        "value": "DE"
+    }, {
+        "text": "FR",
+        "value": "FR"
+    }, {
+        "text": "ES",
+        "value": "ES"
+    }, {
+        "text": "IT",
+        "value": "IT"
+    }, {
+        "text": "NL",
+        "value": "NL"
+    }, {
+        "text": "PL",
+        "value": "PL"
+    }, {
+        "text": "PT-BR",
+        "value": "PT-BR"
+    }, {
+        "text": "PT-PT",
+        "value": "PT-PT"
+    }, {
+        "text": "RU",
+        "value": "RU"
+    }, {
+        "text": "JA",
+        "value": "JA"
+    }, {
+        "text": "ZH",
+        "value": "ZH"
+    }]
 
-    function translate(text, targetLanguage) {
+    function languageIndex(comboBox, value, fallbackIndex) {
+        const index = comboBox.indexOfValue(value || "");
+        return index >= 0 ? index : fallbackIndex;
+    }
+
+    function translate(text, sourceLanguage, targetLanguage) {
         const apiKey = plasmoid.configuration.apiKey;
         const apiHost = plasmoid.configuration.apiHost || "https://api-free.deepl.com";
-        const sourceLanguage = plasmoid.configuration.sourceLang;
+        const normalizedSourceLanguage = sourceLanguage || "";
         if (!apiKey || apiKey.trim().length === 0) {
             statusText = i18n("Set your DeepL API key in the widget settings.");
             return ;
@@ -27,8 +115,8 @@ PlasmoidItem {
             "text": [text],
             "target_lang": targetLanguage || "EN-US"
         };
-        if (sourceLanguage && sourceLanguage.trim().length > 0)
-            body.source_lang = sourceLanguage.trim();
+        if (normalizedSourceLanguage.trim().length > 0)
+            body.source_lang = normalizedSourceLanguage.trim();
 
         const request = new XMLHttpRequest();
         request.open("POST", apiHost + "/v2/translate");
@@ -102,25 +190,59 @@ PlasmoidItem {
                 selectByMouse: true
             }
 
-            RowLayout {
+            GridLayout {
                 Layout.fillWidth: true
+                columns: 2
+                columnSpacing: Kirigami.Units.smallSpacing
 
-                QQC2.ComboBox {
-                    id: targetLang
-
+                ColumnLayout {
                     Layout.fillWidth: true
-                    editable: true
-                    model: ["EN-US", "EN-GB", "TR", "DE", "FR", "ES", "IT", "NL", "PL", "PT-BR", "PT-PT", "RU", "JA", "ZH"]
-                    Component.onCompleted: editText = plasmoid.configuration.targetLang || "EN-US"
+                    spacing: Kirigami.Units.smallSpacing / 2
+
+                    PlasmaComponents.Label {
+                        text: i18n("From")
+                    }
+
+                    QQC2.ComboBox {
+                        id: sourceLang
+
+                        Layout.fillWidth: true
+                        textRole: "text"
+                        valueRole: "value"
+                        model: root.sourceLanguages
+                        Component.onCompleted: currentIndex = root.languageIndex(sourceLang, plasmoid.configuration.sourceLang, 0)
+                    }
+
                 }
 
-                QQC2.Button {
-                    text: root.busy ? i18n("Translating") : i18n("Translate")
-                    enabled: !root.busy && inputText.text.trim().length > 0
-                    icon.name: "run-build"
-                    onClicked: root.translate(inputText.text, targetLang.editText)
+                ColumnLayout {
+                    Layout.fillWidth: true
+                    spacing: Kirigami.Units.smallSpacing / 2
+
+                    PlasmaComponents.Label {
+                        text: i18n("To")
+                    }
+
+                    QQC2.ComboBox {
+                        id: targetLang
+
+                        Layout.fillWidth: true
+                        textRole: "text"
+                        valueRole: "value"
+                        model: root.targetLanguages
+                        Component.onCompleted: currentIndex = root.languageIndex(targetLang, plasmoid.configuration.targetLang, 0)
+                    }
+
                 }
 
+            }
+
+            QQC2.Button {
+                Layout.alignment: Qt.AlignRight
+                text: root.busy ? i18n("Translating") : i18n("Translate")
+                enabled: !root.busy && inputText.text.trim().length > 0
+                icon.name: "run-build"
+                onClicked: root.translate(inputText.text, sourceLang.currentValue, targetLang.currentValue)
             }
 
             QQC2.TextArea {
