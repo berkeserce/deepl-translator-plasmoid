@@ -9,6 +9,8 @@ This project is an independent widget and is not affiliated with DeepL SE.
 - Panel icon with a compact popup translator
 - DeepL API Free and Pro endpoint selection
 - Configurable source and target language
+- Local 128 KiB request size guard
+- Friendly DeepL error messages
 - Copyable translation result
 
 ## Requirements
@@ -55,6 +57,10 @@ for DeepL API Free accounts and the Pro endpoint for paid API accounts.
 Set default source and target languages in the widget settings. The translator
 popup lets you override both languages for each translation. Choose **Auto
 detect** as the source language to let DeepL detect the input language.
+
+The popup shows the current request size and blocks requests that exceed
+DeepL's 128 KiB text translation limit. Successful translations show the
+detected source language and billed character count when DeepL returns them.
 
 The API key is stored in the widget's local Plasma configuration. Do not commit
 your personal Plasma config files to this repository.
