@@ -99,13 +99,48 @@ PlasmoidItem {
         "value": "ZH"
     }]
 
-    function languageIndex(comboBox, value, fallbackIndex) {
-        const index = comboBox.indexOfValue(value || "");
-        return index >= 0 ? index : fallbackIndex;
+    function languageValue(languages, index) {
+        if (!languages || index < 0 || index >= languages.length)
+            return "";
+
+        const language = languages[index];
+        return language && language.value !== undefined ? language.value : "";
+    }
+
+    function languageIndex(languages, value, fallbackIndex) {
+        const selectedValue = value || "";
+        for (let i = 0; i < languages.length; i++) {
+            if (languages[i].value === selectedValue)
+                return i;
+        }
+
+        return fallbackIndex;
+    }
+
+    function hasLanguage(languages, value) {
+        return languageIndex(languages, value, -1) >= 0;
+    }
+
+    function firstTargetForLanguageFamily(language) {
+        const family = TranslationEngine.languageFamily(language);
+        for (let i = 0; i < targetLanguages.length; i++) {
+            if (TranslationEngine.languageFamily(targetLanguages[i].value) === family)
+                return targetLanguages[i].value;
+        }
+
+        return "";
+    }
+
+    function sourceLanguage() {
+        return languageValue(sourceLanguages, sourceLang.currentIndex);
+    }
+
+    function targetLanguage() {
+        return languageValue(targetLanguages, targetLang.currentIndex) || "EN-US";
     }
 
     function currentValidation() {
-        return TranslationEngine.validateRequest(inputText.text, sourceLang.currentValue, targetLang.currentValue);
+        return TranslationEngine.validateRequest(inputText.text, sourceLanguage(), targetLanguage());
     }
 
     function requestSizeRatio() {
@@ -142,30 +177,29 @@ PlasmoidItem {
         return Kirigami.Theme.textColor;
     }
 
-    function setComboValue(comboBox, value, fallbackIndex) {
-        const index = comboBox.indexOfValue(value || "");
-        comboBox.currentIndex = index >= 0 ? index : fallbackIndex;
+    function setComboValue(comboBox, languages, value, fallbackIndex) {
+        comboBox.currentIndex = languageIndex(languages, value, fallbackIndex);
     }
 
     function sourceValueForTarget(targetLanguage) {
         const target = TranslationEngine.normalizeLanguage(targetLanguage);
-        if (sourceLang.indexOfValue(target) >= 0)
+        if (hasLanguage(sourceLanguages, target))
             return target;
 
         const family = TranslationEngine.languageFamily(target);
-        return sourceLang.indexOfValue(family) >= 0 ? family : "";
+        return hasLanguage(sourceLanguages, family) ? family : "";
     }
 
     function targetValueForSource(sourceLanguage) {
         const source = TranslationEngine.normalizeLanguage(sourceLanguage);
-        if (targetLang.indexOfValue(source) >= 0)
+        if (hasLanguage(targetLanguages, source))
             return source;
 
         const family = TranslationEngine.languageFamily(source);
         if (family === "EN")
             return "EN-US";
 
-        return targetLang.indexOfValue(family) >= 0 ? family : "";
+        return firstTargetForLanguageFamily(family);
     }
 
     function fallbackTargetForAutoDetect(previousTarget) {
@@ -186,19 +220,19 @@ PlasmoidItem {
     }
 
     function swapLanguagesAndText(inputTextArea) {
-        const previousSource = sourceLang.currentValue;
-        const previousTarget = targetLang.currentValue;
+        const previousSource = sourceLanguage();
+        const previousTarget = targetLanguage();
         const previousInput = inputTextArea.text;
         const previousOutput = translatedText;
         const sourceForTarget = sourceValueForTarget(previousTarget);
         const targetForSource = previousSource && previousSource.length > 0 ? targetValueForSource(previousSource) : targetValueForAutoDetect(previousTarget, lastDetectedSourceLanguage);
-        setComboValue(sourceLang, sourceForTarget, 0);
-        setComboValue(targetLang, targetForSource, 0);
+        setComboValue(sourceLang, sourceLanguages, sourceForTarget, 0);
+        setComboValue(targetLang, targetLanguages, targetForSource, 0);
         if (previousOutput.length > 0) {
             inputTextArea.text = previousOutput;
             translatedText = previousInput;
         }
-        setStatus(swapStatus(sourceLang.currentValue, targetLang.currentValue), "neutral");
+        setStatus(swapStatus(sourceLanguage(), targetLanguage()), "neutral");
     }
 
     function clearInput(inputTextArea) {
@@ -353,7 +387,7 @@ PlasmoidItem {
                         textRole: "text"
                         valueRole: "value"
                         model: root.sourceLanguages
-                        Component.onCompleted: currentIndex = root.languageIndex(sourceLang, plasmoid.configuration.sourceLang, 0)
+                        Component.onCompleted: currentIndex = root.languageIndex(root.sourceLanguages, plasmoid.configuration.sourceLang, 0)
                     }
 
                 }
@@ -386,7 +420,7 @@ PlasmoidItem {
                         textRole: "text"
                         valueRole: "value"
                         model: root.targetLanguages
-                        Component.onCompleted: currentIndex = root.languageIndex(targetLang, plasmoid.configuration.targetLang, 0)
+                        Component.onCompleted: currentIndex = root.languageIndex(root.targetLanguages, plasmoid.configuration.targetLang, 0)
                     }
 
                 }
@@ -427,7 +461,7 @@ PlasmoidItem {
                     if ((event.key === Qt.Key_Return || event.key === Qt.Key_Enter) && !(event.modifiers & Qt.ShiftModifier)) {
                         event.accepted = true;
                         if (!root.busy && inputText.text.trim().length > 0)
-                            root.translate(inputText.text, sourceLang.currentValue, targetLang.currentValue);
+                            root.translate(inputText.text, root.sourceLanguage(), root.targetLanguage());
                     }
                 }
             }
@@ -444,7 +478,7 @@ PlasmoidItem {
                         Layout.fillWidth: true
                         color: root.requestSizeColor()
                         elide: Text.ElideRight
-                        text: root.currentValidation().ok ? TranslationEngine.requestSizeText(inputText.text, sourceLang.currentValue, targetLang.currentValue) : root.currentValidation().message
+                        text: root.currentValidation().ok ? TranslationEngine.requestSizeText(inputText.text, root.sourceLanguage(), root.targetLanguage()) : root.currentValidation().message
                     }
 
                     QQC2.ProgressBar {
@@ -461,7 +495,7 @@ PlasmoidItem {
                     text: root.busy ? i18n("Translating") : i18n("Translate")
                     enabled: !root.busy && inputText.text.trim().length > 0
                     icon.name: "run-build"
-                    onClicked: root.translate(inputText.text, sourceLang.currentValue, targetLang.currentValue)
+                    onClicked: root.translate(inputText.text, root.sourceLanguage(), root.targetLanguage())
                 }
 
             }
