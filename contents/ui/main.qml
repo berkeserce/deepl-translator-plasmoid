@@ -131,31 +131,6 @@ PlasmoidItem {
         return "";
     }
 
-    function sourceLanguage() {
-        return languageValue(sourceLanguages, sourceLang.currentIndex);
-    }
-
-    function targetLanguage() {
-        return languageValue(targetLanguages, targetLang.currentIndex) || "EN-US";
-    }
-
-    function currentValidation() {
-        return TranslationEngine.validateRequest(inputText.text, sourceLanguage(), targetLanguage());
-    }
-
-    function requestSizeRatio() {
-        const validation = currentValidation();
-        return validation.limitBytes > 0 ? Math.min(validation.bytes / validation.limitBytes, 1) : 0;
-    }
-
-    function requestSizeColor() {
-        const validation = currentValidation();
-        if (!validation.ok)
-            return Kirigami.Theme.negativeTextColor;
-
-        return requestSizeRatio() >= 0.85 ? Kirigami.Theme.neutralTextColor : Kirigami.Theme.disabledTextColor;
-    }
-
     function setStatus(message, tone) {
         statusText = message;
         statusTone = tone || "neutral";
@@ -217,22 +192,6 @@ PlasmoidItem {
 
     function swapStatus(sourceLanguage, targetLanguage) {
         return i18n("Swapped: %1 -> %2", sourceLanguage.length > 0 ? sourceLanguage : i18n("Auto"), targetLanguage);
-    }
-
-    function swapLanguagesAndText(inputTextArea) {
-        const previousSource = sourceLanguage();
-        const previousTarget = targetLanguage();
-        const previousInput = inputTextArea.text;
-        const previousOutput = translatedText;
-        const sourceForTarget = sourceValueForTarget(previousTarget);
-        const targetForSource = previousSource && previousSource.length > 0 ? targetValueForSource(previousSource) : targetValueForAutoDetect(previousTarget, lastDetectedSourceLanguage);
-        setComboValue(sourceLang, sourceLanguages, sourceForTarget, 0);
-        setComboValue(targetLang, targetLanguages, targetForSource, 0);
-        if (previousOutput.length > 0) {
-            inputTextArea.text = previousOutput;
-            translatedText = previousInput;
-        }
-        setStatus(swapStatus(sourceLanguage(), targetLanguage()), "neutral");
     }
 
     function clearInput(inputTextArea) {
@@ -333,6 +292,51 @@ PlasmoidItem {
         implicitWidth: Kirigami.Units.gridUnit * 25
         implicitHeight: Kirigami.Units.gridUnit * 29
 
+        function sourceLanguage() {
+            return root.languageValue(root.sourceLanguages, sourceLang.currentIndex);
+        }
+
+        function targetLanguage() {
+            return root.languageValue(root.targetLanguages, targetLang.currentIndex) || "EN-US";
+        }
+
+        function currentValidation() {
+            return TranslationEngine.validateRequest(inputText.text, sourceLanguage(), targetLanguage());
+        }
+
+        function requestSizeRatio() {
+            const validation = currentValidation();
+            return validation.limitBytes > 0 ? Math.min(validation.bytes / validation.limitBytes, 1) : 0;
+        }
+
+        function requestSizeColor() {
+            const validation = currentValidation();
+            if (!validation.ok)
+                return Kirigami.Theme.negativeTextColor;
+
+            return requestSizeRatio() >= 0.85 ? Kirigami.Theme.neutralTextColor : Kirigami.Theme.disabledTextColor;
+        }
+
+        function swapLanguagesAndText() {
+            const previousSource = sourceLanguage();
+            const previousTarget = targetLanguage();
+            const previousInput = inputText.text;
+            const previousOutput = root.translatedText;
+            const sourceForTarget = root.sourceValueForTarget(previousTarget);
+            const targetForSource = previousSource && previousSource.length > 0 ? root.targetValueForSource(previousSource) : root.targetValueForAutoDetect(previousTarget, root.lastDetectedSourceLanguage);
+            root.setComboValue(sourceLang, root.sourceLanguages, sourceForTarget, 0);
+            root.setComboValue(targetLang, root.targetLanguages, targetForSource, 0);
+            if (previousOutput.length > 0) {
+                inputText.text = previousOutput;
+                root.translatedText = previousInput;
+            }
+            root.setStatus(root.swapStatus(sourceLanguage(), targetLanguage()), "neutral");
+        }
+
+        function translateInput() {
+            root.translate(inputText.text, sourceLanguage(), targetLanguage());
+        }
+
         ColumnLayout {
             anchors.fill: parent
             anchors.margins: Kirigami.Units.largeSpacing
@@ -398,7 +402,7 @@ PlasmoidItem {
                     Layout.alignment: Qt.AlignHCenter | Qt.AlignBottom
                     enabled: !root.busy
                     icon.name: "exchange-positions"
-                    onClicked: root.swapLanguagesAndText(inputText)
+                    onClicked: popup.swapLanguagesAndText()
                     QQC2.ToolTip.delay: Kirigami.Units.toolTipDelay
                     QQC2.ToolTip.text: i18n("Swap languages and text")
                     QQC2.ToolTip.visible: hovered
@@ -461,7 +465,7 @@ PlasmoidItem {
                     if ((event.key === Qt.Key_Return || event.key === Qt.Key_Enter) && !(event.modifiers & Qt.ShiftModifier)) {
                         event.accepted = true;
                         if (!root.busy && inputText.text.trim().length > 0)
-                            root.translate(inputText.text, root.sourceLanguage(), root.targetLanguage());
+                            popup.translateInput();
                     }
                 }
             }
@@ -476,16 +480,16 @@ PlasmoidItem {
 
                     PlasmaComponents.Label {
                         Layout.fillWidth: true
-                        color: root.requestSizeColor()
+                        color: popup.requestSizeColor()
                         elide: Text.ElideRight
-                        text: root.currentValidation().ok ? TranslationEngine.requestSizeText(inputText.text, root.sourceLanguage(), root.targetLanguage()) : root.currentValidation().message
+                        text: popup.currentValidation().ok ? TranslationEngine.requestSizeText(inputText.text, popup.sourceLanguage(), popup.targetLanguage()) : popup.currentValidation().message
                     }
 
                     QQC2.ProgressBar {
                         Layout.fillWidth: true
                         from: 0
-                        to: root.currentValidation().limitBytes
-                        value: Math.min(root.currentValidation().bytes, root.currentValidation().limitBytes)
+                        to: popup.currentValidation().limitBytes
+                        value: Math.min(popup.currentValidation().bytes, popup.currentValidation().limitBytes)
                     }
 
                 }
@@ -495,7 +499,7 @@ PlasmoidItem {
                     text: root.busy ? i18n("Translating") : i18n("Translate")
                     enabled: !root.busy && inputText.text.trim().length > 0
                     icon.name: "run-build"
-                    onClicked: root.translate(inputText.text, root.sourceLanguage(), root.targetLanguage())
+                    onClicked: popup.translateInput()
                 }
 
             }
