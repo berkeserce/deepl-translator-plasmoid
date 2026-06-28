@@ -372,7 +372,7 @@ PlasmoidItem {
         id: popup
 
         implicitWidth: Kirigami.Units.gridUnit * 25
-        implicitHeight: Kirigami.Units.gridUnit * 34
+        implicitHeight: Kirigami.Units.gridUnit * 29
 
         function sourceLanguage() {
             return root.languageValue(root.sourceLanguages, sourceLang.currentIndex);
@@ -451,6 +451,7 @@ PlasmoidItem {
             root.translatedText = item.translatedText || "";
             root.lastDetectedSourceLanguage = item.detectedSourceLanguage || "";
             inputText.forceActiveFocus();
+            historyPopup.close();
             root.setStatus(i18n("Loaded from history"), "neutral");
         }
 
@@ -671,6 +672,15 @@ PlasmoidItem {
                 }
 
                 QQC2.ToolButton {
+                    enabled: root.translationHistory.length > 0
+                    icon.name: "document-open-recent"
+                    onClicked: historyPopup.open()
+                    QQC2.ToolTip.delay: Kirigami.Units.toolTipDelay
+                    QQC2.ToolTip.text: i18n("Show history")
+                    QQC2.ToolTip.visible: hovered
+                }
+
+                QQC2.ToolButton {
                     enabled: !root.busy && root.translatedText.length > 0
                     icon.name: "edit-copy"
                     onClicked: root.copyTranslation()
@@ -702,10 +712,21 @@ PlasmoidItem {
                 }
             }
 
+        }
+
+        QQC2.Popup {
+            id: historyPopup
+
+            anchors.centerIn: parent
+            closePolicy: QQC2.Popup.CloseOnEscape | QQC2.Popup.CloseOnPressOutside
+            height: Math.min(parent.height - Kirigami.Units.gridUnit * 2, Kirigami.Units.gridUnit * 18)
+            modal: true
+            padding: Kirigami.Units.smallSpacing
+            width: Math.min(parent.width - Kirigami.Units.gridUnit * 2, Kirigami.Units.gridUnit * 22)
+
             ColumnLayout {
-                Layout.fillWidth: true
-                visible: root.translationHistory.length > 0
-                spacing: Kirigami.Units.smallSpacing / 2
+                anchors.fill: parent
+                spacing: Kirigami.Units.smallSpacing
 
                 RowLayout {
                     Layout.fillWidth: true
@@ -717,19 +738,30 @@ PlasmoidItem {
                     }
 
                     QQC2.ToolButton {
-                        enabled: !root.busy
+                        enabled: root.translationHistory.length > 0
                         icon.name: "edit-clear-history"
-                        onClicked: root.clearTranslationHistory()
+                        onClicked: {
+                            root.clearTranslationHistory();
+                            historyPopup.close();
+                        }
                         QQC2.ToolTip.delay: Kirigami.Units.toolTipDelay
                         QQC2.ToolTip.text: i18n("Clear history")
+                        QQC2.ToolTip.visible: hovered
+                    }
+
+                    QQC2.ToolButton {
+                        icon.name: "window-close"
+                        onClicked: historyPopup.close()
+                        QQC2.ToolTip.delay: Kirigami.Units.toolTipDelay
+                        QQC2.ToolTip.text: i18n("Close")
                         QQC2.ToolTip.visible: hovered
                     }
 
                 }
 
                 QQC2.ScrollView {
+                    Layout.fillHeight: true
                     Layout.fillWidth: true
-                    Layout.preferredHeight: Kirigami.Units.gridUnit * 5
                     clip: true
 
                     ListView {
