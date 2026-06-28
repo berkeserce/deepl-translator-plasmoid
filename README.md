@@ -12,6 +12,9 @@ This project is an independent widget and is not affiliated with DeepL SE.
 - Local 128 KiB request size guard
 - Friendly DeepL error messages
 - Copyable translation result
+- Optional automatic copy after translation
+- Recent translation history in the popup
+- Paste-and-translate and keyboard shortcuts
 
 ## Requirements
 
@@ -61,6 +64,19 @@ detect** as the source language to let DeepL detect the input language.
 The popup shows the current request size and blocks requests that exceed
 DeepL's 128 KiB text translation limit. Successful translations show the
 detected source language and billed character count when DeepL returns them.
+
+Enable automatic copy in the widget settings if you want successful
+translations copied to the clipboard immediately. The popup keeps a local
+recent translation history so previous source/result pairs can be restored
+quickly. Use the paste button to translate the current clipboard contents.
+
+Keyboard shortcuts in the popup:
+
+- `Enter`: translate
+- `Shift+Enter`: insert a new line
+- `Ctrl+Enter`: translate
+- `Ctrl+L`: focus and select the source text
+- `Ctrl+C`: copy the translation when no text selection is active
 
 The API key is stored in the widget's local Plasma configuration. Do not commit
 your personal Plasma config files to this repository.
