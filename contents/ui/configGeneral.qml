@@ -10,6 +10,7 @@ Kirigami.FormLayout {
     property string cfg_apiHost: "https://api-free.deepl.com"
     property string cfg_targetLang: "EN-US"
     property string cfg_sourceLang: ""
+    property alias cfg_autoCopy: autoCopyBox.checked
     property var sourceLanguages: [{
         "text": i18n("Auto detect"),
         "value": ""
@@ -147,6 +148,13 @@ Kirigami.FormLayout {
         model: page.sourceLanguages
         Component.onCompleted: currentIndex = page.languageIndex(sourceLangBox, page.cfg_sourceLang, 0)
         onCurrentValueChanged: page.cfg_sourceLang = currentValue
+    }
+
+    QQC2.CheckBox {
+        id: autoCopyBox
+
+        Kirigami.FormData.label: i18n("Clipboard:")
+        text: i18n("Copy translations automatically")
     }
 
     QQC2.Label {

@@ -17,5 +17,11 @@
     <entry name="sourceLang" type="String">
       <default></default>
     </entry>
+    <entry name="autoCopy" type="Bool">
+      <default>false</default>
+    </entry>
+    <entry name="translationHistory" type="String">
+      <default>[]</default>
+    </entry>
   </group>
 </kcfg>

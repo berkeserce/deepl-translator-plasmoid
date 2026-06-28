@@ -3,6 +3,7 @@ import QtQuick.Controls as QQC2
 import QtQuick.Layouts
 import "TranslationEngine.js" as TranslationEngine
 import org.kde.kirigami as Kirigami
+import org.kde.kquickcontrolsaddons 2.0 as KQuickControlsAddons
 import org.kde.plasma.components as PlasmaComponents
 import org.kde.plasma.plasmoid
 
@@ -14,7 +15,9 @@ PlasmoidItem {
     property string statusTone: "neutral"
     property string translatedText: ""
     property string lastDetectedSourceLanguage: ""
+    property var translationHistory: []
     readonly property url appIconSource: Qt.resolvedUrl("../images/deepl-translator.svg")
+    readonly property int historyLimit: 20
     property var sourceLanguages: [{
         "text": i18n("Auto detect"),
         "value": ""
@@ -136,6 +139,70 @@ PlasmoidItem {
         statusTone = tone || "neutral";
     }
 
+    function clipboardText() {
+        if (clipboard.content === undefined || clipboard.content === null)
+            return "";
+
+        return String(clipboard.content);
+    }
+
+    function copyToClipboard(text) {
+        clipboard.content = text;
+    }
+
+    function compactText(text) {
+        const singleLine = (text || "").replace(/\s+/g, " ").trim();
+        return singleLine.length > 64 ? singleLine.slice(0, 61) + "..." : singleLine;
+    }
+
+    function historyLabel(item) {
+        const source = item.detectedSourceLanguage || item.sourceLanguage || i18n("Auto");
+        const target = item.targetLanguage || "EN-US";
+        return source + " -> " + target + ": " + compactText(item.sourceText);
+    }
+
+    function loadTranslationHistory() {
+        try {
+            const parsedHistory = JSON.parse(plasmoid.configuration.translationHistory || "[]");
+            translationHistory = Array.isArray(parsedHistory) ? parsedHistory.slice(0, historyLimit) : [];
+        } catch (error) {
+            translationHistory = [];
+        }
+    }
+
+    function saveTranslationHistory() {
+        plasmoid.configuration.translationHistory = JSON.stringify(translationHistory.slice(0, historyLimit));
+    }
+
+    function addTranslationHistory(sourceText, translatedText, sourceLanguage, targetLanguage, result) {
+        if (!sourceText || !translatedText)
+            return ;
+
+        const item = {
+            "sourceText": sourceText,
+            "translatedText": translatedText,
+            "sourceLanguage": TranslationEngine.normalizeLanguage(sourceLanguage),
+            "targetLanguage": TranslationEngine.normalizeLanguage(targetLanguage) || "EN-US",
+            "detectedSourceLanguage": TranslationEngine.normalizeLanguage(result.detectedSourceLanguage),
+            "timestamp": Date.now()
+        };
+        const filteredHistory = translationHistory.filter(function(historyItem) {
+            return historyItem.sourceText !== item.sourceText
+                || historyItem.translatedText !== item.translatedText
+                || historyItem.sourceLanguage !== item.sourceLanguage
+                || historyItem.targetLanguage !== item.targetLanguage;
+        });
+        filteredHistory.unshift(item);
+        translationHistory = filteredHistory.slice(0, historyLimit);
+        saveTranslationHistory();
+    }
+
+    function clearTranslationHistory() {
+        translationHistory = [];
+        saveTranslationHistory();
+        setStatus(i18n("History cleared"), "neutral");
+    }
+
     function statusColor() {
         if (statusText.length === 0)
             return Kirigami.Theme.disabledTextColor;
@@ -204,13 +271,11 @@ PlasmoidItem {
         setStatus("", "neutral");
     }
 
-    function copyTranslation(textArea) {
+    function copyTranslation() {
         if (translatedText.length === 0)
             return ;
 
-        textArea.forceActiveFocus();
-        textArea.selectAll();
-        textArea.copy();
+        copyToClipboard(translatedText);
         setStatus(i18n("Copied"), "success");
     }
 
@@ -245,7 +310,18 @@ PlasmoidItem {
                     const response = TranslationEngine.parseTranslateResponse(request.responseText);
                     translatedText = response.text;
                     lastDetectedSourceLanguage = response.detectedSourceLanguage;
-                    setStatus(translatedText.length > 0 ? TranslationEngine.formatSuccessStatus(response, sourceLanguage, targetLanguage) : i18n("No translation returned."), translatedText.length > 0 ? "success" : "warning");
+                    if (translatedText.length > 0) {
+                        addTranslationHistory(text, translatedText, sourceLanguage, targetLanguage, response);
+                        const successStatus = TranslationEngine.formatSuccessStatus(response, sourceLanguage, targetLanguage);
+                        if (plasmoid.configuration.autoCopy) {
+                            copyToClipboard(translatedText);
+                            setStatus(successStatus + " · " + i18n("Copied"), "success");
+                        } else {
+                            setStatus(successStatus, "success");
+                        }
+                    } else {
+                        setStatus(i18n("No translation returned."), "warning");
+                    }
                 } catch (error) {
                     setStatus(i18n("Could not read DeepL response."), "error");
                 }
@@ -258,6 +334,12 @@ PlasmoidItem {
             setStatus(TranslationEngine.formatDeepLError(0, ""), "error");
         };
         request.send(JSON.stringify(body));
+    }
+
+    Component.onCompleted: loadTranslationHistory()
+
+    KQuickControlsAddons.Clipboard {
+        id: clipboard
     }
 
     Plasmoid.icon: "accessories-dictionary"
@@ -290,7 +372,7 @@ PlasmoidItem {
         id: popup
 
         implicitWidth: Kirigami.Units.gridUnit * 25
-        implicitHeight: Kirigami.Units.gridUnit * 29
+        implicitHeight: Kirigami.Units.gridUnit * 34
 
         function sourceLanguage() {
             return root.languageValue(root.sourceLanguages, sourceLang.currentIndex);
@@ -335,6 +417,62 @@ PlasmoidItem {
 
         function translateInput() {
             root.translate(inputText.text, sourceLanguage(), targetLanguage());
+        }
+
+        function translateIfReady() {
+            if (!root.busy && inputText.text.trim().length > 0)
+                translateInput();
+        }
+
+        function pasteAndTranslate() {
+            if (root.busy)
+                return ;
+
+            const text = root.clipboardText();
+            if (text.trim().length === 0) {
+                root.setStatus(i18n("Clipboard is empty"), "warning");
+                return ;
+            }
+            inputText.text = text;
+            root.translatedText = "";
+            root.lastDetectedSourceLanguage = "";
+            inputText.forceActiveFocus();
+            translateInput();
+        }
+
+        function loadHistoryItem(index) {
+            if (index < 0 || index >= root.translationHistory.length)
+                return ;
+
+            const item = root.translationHistory[index];
+            root.setComboValue(sourceLang, root.sourceLanguages, item.sourceLanguage || "", 0);
+            root.setComboValue(targetLang, root.targetLanguages, item.targetLanguage || "EN-US", 0);
+            inputText.text = item.sourceText || "";
+            root.translatedText = item.translatedText || "";
+            root.lastDetectedSourceLanguage = item.detectedSourceLanguage || "";
+            inputText.forceActiveFocus();
+            root.setStatus(i18n("Loaded from history"), "neutral");
+        }
+
+        function focusSource() {
+            inputText.forceActiveFocus();
+            inputText.selectAll();
+        }
+
+        Shortcut {
+            sequences: ["Ctrl+Return", "Ctrl+Enter"]
+            onActivated: popup.translateIfReady()
+        }
+
+        Shortcut {
+            sequence: "Ctrl+L"
+            onActivated: popup.focusSource()
+        }
+
+        Shortcut {
+            sequence: "Ctrl+C"
+            enabled: root.translatedText.length > 0 && !inputText.activeFocus && !outputText.activeFocus
+            onActivated: root.copyTranslation()
         }
 
         ColumnLayout {
@@ -388,6 +526,7 @@ PlasmoidItem {
 
                         Layout.fillWidth: true
                         Layout.minimumWidth: Kirigami.Units.gridUnit * 7
+                        enabled: !root.busy
                         textRole: "text"
                         valueRole: "value"
                         model: root.sourceLanguages
@@ -421,6 +560,7 @@ PlasmoidItem {
 
                         Layout.fillWidth: true
                         Layout.minimumWidth: Kirigami.Units.gridUnit * 7
+                        enabled: !root.busy
                         textRole: "text"
                         valueRole: "value"
                         model: root.targetLanguages
@@ -447,7 +587,16 @@ PlasmoidItem {
                     icon.name: "edit-clear"
                     onClicked: root.clearInput(inputText)
                     QQC2.ToolTip.delay: Kirigami.Units.toolTipDelay
-                    QQC2.ToolTip.text: i18n("Clear source text")
+                    QQC2.ToolTip.text: i18n("Clear all")
+                    QQC2.ToolTip.visible: hovered
+                }
+
+                QQC2.ToolButton {
+                    enabled: !root.busy
+                    icon.name: "edit-paste"
+                    onClicked: popup.pasteAndTranslate()
+                    QQC2.ToolTip.delay: Kirigami.Units.toolTipDelay
+                    QQC2.ToolTip.text: i18n("Paste and translate")
                     QQC2.ToolTip.visible: hovered
                 }
 
@@ -458,14 +607,20 @@ PlasmoidItem {
 
                 Layout.fillWidth: true
                 Layout.preferredHeight: Kirigami.Units.gridUnit * 7
+                readOnly: root.busy
                 wrapMode: TextEdit.Wrap
                 placeholderText: i18n("Text to translate")
                 selectByMouse: true
                 Keys.onPressed: function(event) {
                     if ((event.key === Qt.Key_Return || event.key === Qt.Key_Enter) && !(event.modifiers & Qt.ShiftModifier)) {
                         event.accepted = true;
-                        if (!root.busy && inputText.text.trim().length > 0)
-                            popup.translateInput();
+                        popup.translateIfReady();
+                    } else if ((event.modifiers & Qt.ControlModifier) && event.key === Qt.Key_L) {
+                        event.accepted = true;
+                        popup.focusSource();
+                    } else if ((event.modifiers & Qt.ControlModifier) && event.key === Qt.Key_C && inputText.selectedText.length === 0 && root.translatedText.length > 0) {
+                        event.accepted = true;
+                        root.copyTranslation();
                     }
                 }
             }
@@ -516,9 +671,9 @@ PlasmoidItem {
                 }
 
                 QQC2.ToolButton {
-                    enabled: root.translatedText.length > 0
+                    enabled: !root.busy && root.translatedText.length > 0
                     icon.name: "edit-copy"
-                    onClicked: root.copyTranslation(outputText)
+                    onClicked: root.copyTranslation()
                     QQC2.ToolTip.delay: Kirigami.Units.toolTipDelay
                     QQC2.ToolTip.text: i18n("Copy translation")
                     QQC2.ToolTip.visible: hovered
@@ -536,6 +691,68 @@ PlasmoidItem {
                 text: root.translatedText
                 placeholderText: i18n("Translation")
                 selectByMouse: true
+                Keys.onPressed: function(event) {
+                    if ((event.modifiers & Qt.ControlModifier) && event.key === Qt.Key_L) {
+                        event.accepted = true;
+                        popup.focusSource();
+                    } else if ((event.modifiers & Qt.ControlModifier) && event.key === Qt.Key_C && outputText.selectedText.length === 0 && root.translatedText.length > 0) {
+                        event.accepted = true;
+                        root.copyTranslation();
+                    }
+                }
+            }
+
+            ColumnLayout {
+                Layout.fillWidth: true
+                visible: root.translationHistory.length > 0
+                spacing: Kirigami.Units.smallSpacing / 2
+
+                RowLayout {
+                    Layout.fillWidth: true
+
+                    PlasmaComponents.Label {
+                        Layout.fillWidth: true
+                        font.weight: Font.DemiBold
+                        text: i18n("History")
+                    }
+
+                    QQC2.ToolButton {
+                        enabled: !root.busy
+                        icon.name: "edit-clear-history"
+                        onClicked: root.clearTranslationHistory()
+                        QQC2.ToolTip.delay: Kirigami.Units.toolTipDelay
+                        QQC2.ToolTip.text: i18n("Clear history")
+                        QQC2.ToolTip.visible: hovered
+                    }
+
+                }
+
+                QQC2.ScrollView {
+                    Layout.fillWidth: true
+                    Layout.preferredHeight: Kirigami.Units.gridUnit * 5
+                    clip: true
+
+                    ListView {
+                        id: historyList
+
+                        model: root.translationHistory
+                        spacing: Kirigami.Units.smallSpacing / 2
+
+                        delegate: QQC2.ItemDelegate {
+                            required property int index
+                            required property var modelData
+
+                            width: historyList.width
+                            enabled: !root.busy
+                            icon.name: "document-open-recent"
+                            text: root.historyLabel(modelData)
+                            onClicked: popup.loadHistoryItem(index)
+                        }
+
+                    }
+
+                }
+
             }
 
         }
