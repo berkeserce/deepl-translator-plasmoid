@@ -1,6 +1,7 @@
 import QtQuick
 import QtQuick.Controls as QQC2
 import QtQuick.Layouts
+import "TranslationEngine.js" as TranslationEngine
 import org.kde.kirigami as Kirigami
 import org.kde.plasma.components as PlasmaComponents
 import org.kde.plasma.plasmoid
@@ -113,7 +114,6 @@ PlasmoidItem {
     function translate(text, sourceLanguage, targetLanguage) {
         const apiKey = plasmoid.configuration.apiKey;
         const apiHost = plasmoid.configuration.apiHost || "https://api-free.deepl.com";
-        const normalizedSourceLanguage = sourceLanguage || "";
         if (!apiKey || apiKey.trim().length === 0) {
             statusText = i18n("Set your DeepL API key in the widget settings.");
             return ;
@@ -121,13 +121,7 @@ PlasmoidItem {
         busy = true;
         statusText = i18n("Translating...");
         translatedText = "";
-        const body = {
-            "text": [text],
-            "target_lang": targetLanguage || "EN-US"
-        };
-        if (normalizedSourceLanguage.trim().length > 0)
-            body.source_lang = normalizedSourceLanguage.trim();
-
+        const body = TranslationEngine.buildRequestBody(text, sourceLanguage, targetLanguage);
         const request = new XMLHttpRequest();
         request.open("POST", apiHost + "/v2/translate");
         request.setRequestHeader("Authorization", "DeepL-Auth-Key " + apiKey.trim());
@@ -139,15 +133,15 @@ PlasmoidItem {
             busy = false;
             if (request.status >= 200 && request.status < 300) {
                 try {
-                    const response = JSON.parse(request.responseText);
-                    translatedText = response.translations && response.translations.length > 0 ? response.translations[0].text : "";
+                    const response = TranslationEngine.parseTranslateResponse(request.responseText);
+                    translatedText = response.text;
                     statusText = translatedText.length > 0 ? i18n("Done") : i18n("No translation returned.");
                 } catch (error) {
                     statusText = i18n("Could not read DeepL response.");
                 }
                 return ;
             }
-            statusText = i18n("DeepL error: %1", request.status);
+            statusText = TranslationEngine.formatDeepLError(request.status, request.responseText);
         };
         request.onerror = function() {
             busy = false;
