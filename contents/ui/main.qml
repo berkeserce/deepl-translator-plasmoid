@@ -11,6 +11,7 @@ PlasmoidItem {
 
     property bool busy: false
     property string statusText: ""
+    property string statusTone: "neutral"
     property string translatedText: ""
     property string lastDetectedSourceLanguage: ""
     property var sourceLanguages: [{
@@ -106,6 +107,40 @@ PlasmoidItem {
         return TranslationEngine.validateRequest(inputText.text, sourceLang.currentValue, targetLang.currentValue);
     }
 
+    function requestSizeRatio() {
+        const validation = currentValidation();
+        return validation.limitBytes > 0 ? Math.min(validation.bytes / validation.limitBytes, 1) : 0;
+    }
+
+    function requestSizeColor() {
+        const validation = currentValidation();
+        if (!validation.ok)
+            return Kirigami.Theme.negativeTextColor;
+
+        return requestSizeRatio() >= 0.85 ? Kirigami.Theme.neutralTextColor : Kirigami.Theme.disabledTextColor;
+    }
+
+    function setStatus(message, tone) {
+        statusText = message;
+        statusTone = tone || "neutral";
+    }
+
+    function statusColor() {
+        if (statusText.length === 0)
+            return Kirigami.Theme.disabledTextColor;
+
+        if (statusTone === "error")
+            return Kirigami.Theme.negativeTextColor;
+
+        if (statusTone === "success")
+            return Kirigami.Theme.positiveTextColor;
+
+        if (statusTone === "warning")
+            return Kirigami.Theme.neutralTextColor;
+
+        return Kirigami.Theme.textColor;
+    }
+
     function setComboValue(comboBox, value, fallbackIndex) {
         const index = comboBox.indexOfValue(value || "");
         comboBox.currentIndex = index >= 0 ? index : fallbackIndex;
@@ -162,7 +197,17 @@ PlasmoidItem {
             inputTextArea.text = previousOutput;
             translatedText = previousInput;
         }
-        statusText = swapStatus(sourceLang.currentValue, targetLang.currentValue);
+        setStatus(swapStatus(sourceLang.currentValue, targetLang.currentValue), "neutral");
+    }
+
+    function clearInput(inputTextArea) {
+        if (busy)
+            return ;
+
+        inputTextArea.text = "";
+        translatedText = "";
+        lastDetectedSourceLanguage = "";
+        setStatus("", "neutral");
     }
 
     function copyTranslation(textArea) {
@@ -172,23 +217,23 @@ PlasmoidItem {
         textArea.forceActiveFocus();
         textArea.selectAll();
         textArea.copy();
-        statusText = i18n("Copied");
+        setStatus(i18n("Copied"), "success");
     }
 
     function translate(text, sourceLanguage, targetLanguage) {
         const apiKey = plasmoid.configuration.apiKey;
         const apiHost = plasmoid.configuration.apiHost || "https://api-free.deepl.com";
         if (!apiKey || apiKey.trim().length === 0) {
-            statusText = i18n("Set your DeepL API key in the widget settings.");
+            setStatus(i18n("Set your DeepL API key in the widget settings."), "warning");
             return ;
         }
         const validation = TranslationEngine.validateRequest(text, sourceLanguage, targetLanguage);
         if (!validation.ok) {
-            statusText = validation.message;
+            setStatus(validation.message, "error");
             return ;
         }
         busy = true;
-        statusText = i18n("Translating...");
+        setStatus(i18n("Translating..."), "neutral");
         translatedText = "";
         lastDetectedSourceLanguage = "";
         const body = TranslationEngine.buildRequestBody(text, sourceLanguage, targetLanguage);
@@ -206,17 +251,17 @@ PlasmoidItem {
                     const response = TranslationEngine.parseTranslateResponse(request.responseText);
                     translatedText = response.text;
                     lastDetectedSourceLanguage = response.detectedSourceLanguage;
-                    statusText = translatedText.length > 0 ? TranslationEngine.formatSuccessStatus(response, sourceLanguage, targetLanguage) : i18n("No translation returned.");
+                    setStatus(translatedText.length > 0 ? TranslationEngine.formatSuccessStatus(response, sourceLanguage, targetLanguage) : i18n("No translation returned."), translatedText.length > 0 ? "success" : "warning");
                 } catch (error) {
-                    statusText = i18n("Could not read DeepL response.");
+                    setStatus(i18n("Could not read DeepL response."), "error");
                 }
                 return ;
             }
-            statusText = TranslationEngine.formatDeepLError(request.status, request.responseText);
+            setStatus(TranslationEngine.formatDeepLError(request.status, request.responseText), "error");
         };
         request.onerror = function() {
             busy = false;
-            statusText = TranslationEngine.formatDeepLError(0, "");
+            setStatus(TranslationEngine.formatDeepLError(0, ""), "error");
         };
         request.send(JSON.stringify(body));
     }
@@ -247,28 +292,43 @@ PlasmoidItem {
     fullRepresentation: Item {
         id: popup
 
-        implicitWidth: Kirigami.Units.gridUnit * 24
-        implicitHeight: Kirigami.Units.gridUnit * 27
+        implicitWidth: Kirigami.Units.gridUnit * 25
+        implicitHeight: Kirigami.Units.gridUnit * 29
 
         ColumnLayout {
             anchors.fill: parent
             anchors.margins: Kirigami.Units.largeSpacing
-            spacing: Kirigami.Units.smallSpacing
+            spacing: Kirigami.Units.smallSpacing * 1.2
 
-            QQC2.TextArea {
-                id: inputText
-
+            RowLayout {
                 Layout.fillWidth: true
-                Layout.preferredHeight: Kirigami.Units.gridUnit * 8
-                wrapMode: TextEdit.Wrap
-                placeholderText: i18n("Text to translate")
-                selectByMouse: true
+                spacing: Kirigami.Units.smallSpacing
+
+                Kirigami.Icon {
+                    Layout.preferredHeight: Kirigami.Units.iconSizes.smallMedium
+                    Layout.preferredWidth: Kirigami.Units.iconSizes.smallMedium
+                    source: Plasmoid.icon
+                }
+
+                PlasmaComponents.Label {
+                    font.weight: Font.DemiBold
+                    text: i18n("DeepL Translator")
+                }
+
+                PlasmaComponents.Label {
+                    Layout.fillWidth: true
+                    color: root.statusColor()
+                    elide: Text.ElideRight
+                    horizontalAlignment: Text.AlignRight
+                    text: root.statusText.length > 0 ? root.statusText : i18n("Ready")
+                }
             }
 
             GridLayout {
                 Layout.fillWidth: true
                 columns: 3
                 columnSpacing: Kirigami.Units.smallSpacing
+                rowSpacing: Kirigami.Units.smallSpacing
 
                 ColumnLayout {
                     Layout.fillWidth: true
@@ -282,6 +342,7 @@ PlasmoidItem {
                         id: sourceLang
 
                         Layout.fillWidth: true
+                        Layout.minimumWidth: Kirigami.Units.gridUnit * 7
                         textRole: "text"
                         valueRole: "value"
                         model: root.sourceLanguages
@@ -314,6 +375,7 @@ PlasmoidItem {
                         id: targetLang
 
                         Layout.fillWidth: true
+                        Layout.minimumWidth: Kirigami.Units.gridUnit * 7
                         textRole: "text"
                         valueRole: "value"
                         model: root.targetLanguages
@@ -324,20 +386,92 @@ PlasmoidItem {
 
             }
 
-            QQC2.Button {
-                Layout.alignment: Qt.AlignRight
-                text: root.busy ? i18n("Translating") : i18n("Translate")
-                enabled: !root.busy && inputText.text.trim().length > 0
-                icon.name: "run-build"
-                onClicked: root.translate(inputText.text, sourceLang.currentValue, targetLang.currentValue)
+            RowLayout {
+                Layout.fillWidth: true
+                Layout.topMargin: Kirigami.Units.smallSpacing
+                spacing: Kirigami.Units.smallSpacing
+
+                PlasmaComponents.Label {
+                    Layout.fillWidth: true
+                    font.weight: Font.DemiBold
+                    text: i18n("Source")
+                }
+
+                QQC2.ToolButton {
+                    enabled: !root.busy && inputText.text.length > 0
+                    icon.name: "edit-clear"
+                    onClicked: root.clearInput(inputText)
+                    QQC2.ToolTip.delay: Kirigami.Units.toolTipDelay
+                    QQC2.ToolTip.text: i18n("Clear source text")
+                    QQC2.ToolTip.visible: hovered
+                }
+
             }
 
-            PlasmaComponents.Label {
+            QQC2.TextArea {
+                id: inputText
+
                 Layout.fillWidth: true
-                color: root.currentValidation().ok ? Kirigami.Theme.disabledTextColor : Kirigami.Theme.negativeTextColor
-                elide: Text.ElideRight
-                horizontalAlignment: Text.AlignRight
-                text: root.currentValidation().ok ? TranslationEngine.requestSizeText(inputText.text, sourceLang.currentValue, targetLang.currentValue) : root.currentValidation().message
+                Layout.preferredHeight: Kirigami.Units.gridUnit * 7
+                wrapMode: TextEdit.Wrap
+                placeholderText: i18n("Text to translate")
+                selectByMouse: true
+            }
+
+            RowLayout {
+                Layout.fillWidth: true
+                spacing: Kirigami.Units.smallSpacing
+
+                ColumnLayout {
+                    Layout.fillWidth: true
+                    spacing: Kirigami.Units.smallSpacing / 2
+
+                    PlasmaComponents.Label {
+                        Layout.fillWidth: true
+                        color: root.requestSizeColor()
+                        elide: Text.ElideRight
+                        text: root.currentValidation().ok ? TranslationEngine.requestSizeText(inputText.text, sourceLang.currentValue, targetLang.currentValue) : root.currentValidation().message
+                    }
+
+                    QQC2.ProgressBar {
+                        Layout.fillWidth: true
+                        from: 0
+                        to: root.currentValidation().limitBytes
+                        value: Math.min(root.currentValidation().bytes, root.currentValidation().limitBytes)
+                    }
+
+                }
+
+                QQC2.Button {
+                    highlighted: true
+                    text: root.busy ? i18n("Translating") : i18n("Translate")
+                    enabled: !root.busy && inputText.text.trim().length > 0
+                    icon.name: "run-build"
+                    onClicked: root.translate(inputText.text, sourceLang.currentValue, targetLang.currentValue)
+                }
+
+            }
+
+            RowLayout {
+                Layout.fillWidth: true
+                Layout.topMargin: Kirigami.Units.smallSpacing
+                spacing: Kirigami.Units.smallSpacing
+
+                PlasmaComponents.Label {
+                    Layout.fillWidth: true
+                    font.weight: Font.DemiBold
+                    text: i18n("Translation")
+                }
+
+                QQC2.ToolButton {
+                    enabled: root.translatedText.length > 0
+                    icon.name: "edit-copy"
+                    onClicked: root.copyTranslation(outputText)
+                    QQC2.ToolTip.delay: Kirigami.Units.toolTipDelay
+                    QQC2.ToolTip.text: i18n("Copy translation")
+                    QQC2.ToolTip.visible: hovered
+                }
+
             }
 
             QQC2.TextArea {
@@ -350,24 +484,6 @@ PlasmoidItem {
                 text: root.translatedText
                 placeholderText: i18n("Translation")
                 selectByMouse: true
-            }
-
-            RowLayout {
-                Layout.fillWidth: true
-
-                PlasmaComponents.Label {
-                    Layout.fillWidth: true
-                    elide: Text.ElideRight
-                    text: root.statusText
-                }
-
-                QQC2.Button {
-                    icon.name: "edit-copy"
-                    enabled: root.translatedText.length > 0
-                    text: i18n("Copy")
-                    onClicked: root.copyTranslation(outputText)
-                }
-
             }
 
         }
