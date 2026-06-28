@@ -113,32 +113,38 @@ PlasmoidItem {
 
     function sourceValueForTarget(targetLanguage) {
         const target = TranslationEngine.normalizeLanguage(targetLanguage);
-        const exactIndex = sourceLang.indexOfValue(target);
-        if (exactIndex >= 0)
+        if (sourceLang.indexOfValue(target) >= 0)
             return target;
 
         const family = TranslationEngine.languageFamily(target);
         return sourceLang.indexOfValue(family) >= 0 ? family : "";
     }
 
-    function targetValueForSource(sourceLanguage) {
+    function targetValueForSourceOrFallback(sourceLanguage, fallbackTarget) {
         const source = TranslationEngine.normalizeLanguage(sourceLanguage);
-        const exactIndex = targetLang.indexOfValue(source);
-        if (exactIndex >= 0)
+        if (targetLang.indexOfValue(source) >= 0)
             return source;
 
         const family = TranslationEngine.languageFamily(source);
         if (family === "EN")
             return "EN-US";
 
-        return targetLang.indexOfValue(family) >= 0 ? family : targetLang.currentValue;
+        return targetLang.indexOfValue(family) >= 0 ? family : fallbackTarget;
+    }
+
+    function safeSwapTargetForAutoDetect(previousTarget) {
+        const detected = targetValueForSourceOrFallback(lastDetectedSourceLanguage, "");
+        if (detected.length > 0)
+            return detected;
+
+        return TranslationEngine.languageFamily(previousTarget) === "EN" ? "TR" : "EN-US";
     }
 
     function swapLanguagesAndText(inputTextArea) {
         const previousSource = sourceLang.currentValue;
         const previousTarget = targetLang.currentValue;
         const sourceForTarget = sourceValueForTarget(previousTarget);
-        const targetForSource = previousSource && previousSource.length > 0 ? targetValueForSource(previousSource) : targetValueForSource(lastDetectedSourceLanguage);
+        const targetForSource = previousSource && previousSource.length > 0 ? targetValueForSourceOrFallback(previousSource, previousTarget) : safeSwapTargetForAutoDetect(previousTarget);
         setComboValue(sourceLang, sourceForTarget, 0);
         setComboValue(targetLang, targetForSource, root.languageIndex(targetLang, previousTarget, 0));
         if (translatedText.length > 0) {
@@ -274,10 +280,12 @@ PlasmoidItem {
 
                 }
 
-                QQC2.ToolButton {
+                QQC2.Button {
+                    Layout.preferredHeight: Kirigami.Units.gridUnit * 2
+                    Layout.preferredWidth: Kirigami.Units.gridUnit * 2
                     Layout.alignment: Qt.AlignHCenter | Qt.AlignBottom
-                    enabled: !root.busy && (inputText.text.length > 0 || root.translatedText.length > 0)
-                    icon.name: "view-refresh"
+                    enabled: !root.busy
+                    icon.name: "exchange-positions"
                     onClicked: root.swapLanguagesAndText(inputText)
                     QQC2.ToolTip.delay: Kirigami.Units.toolTipDelay
                     QQC2.ToolTip.text: i18n("Swap languages and text")
