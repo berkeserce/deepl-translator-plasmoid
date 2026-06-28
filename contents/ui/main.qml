@@ -14,6 +14,7 @@ PlasmoidItem {
     property string statusTone: "neutral"
     property string translatedText: ""
     property string lastDetectedSourceLanguage: ""
+    readonly property url appIconSource: Qt.resolvedUrl("../images/deepl-translator.svg")
     property var sourceLanguages: [{
         "text": i18n("Auto detect"),
         "value": ""
@@ -274,9 +275,12 @@ PlasmoidItem {
         implicitWidth: Kirigami.Units.iconSizes.medium
         implicitHeight: Kirigami.Units.iconSizes.medium
 
-        Kirigami.Icon {
+        Image {
             anchors.fill: parent
-            source: Plasmoid.icon
+            fillMode: Image.PreserveAspectFit
+            mipmap: true
+            smooth: true
+            source: root.appIconSource
         }
 
         MouseArea {
@@ -304,10 +308,13 @@ PlasmoidItem {
                 Layout.fillWidth: true
                 spacing: Kirigami.Units.smallSpacing
 
-                Kirigami.Icon {
+                Image {
                     Layout.preferredHeight: Kirigami.Units.iconSizes.smallMedium
                     Layout.preferredWidth: Kirigami.Units.iconSizes.smallMedium
-                    source: Plasmoid.icon
+                    fillMode: Image.PreserveAspectFit
+                    mipmap: true
+                    smooth: true
+                    source: root.appIconSource
                 }
 
                 PlasmaComponents.Label {
