@@ -11,7 +11,7 @@
     "Id": "com.berkesrs.deepltranslator",
     "License": "GPL-3.0-or-later",
     "Name": "DeepL Translator",
-    "Version": "0.1.0"
+    "Version": "1.0.0"
   },
   "KPackageStructure": "Plasma/Applet",
   "X-Plasma-API-Minimum-Version": "6.0"

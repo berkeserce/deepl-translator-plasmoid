@@ -39,6 +39,30 @@ kpackagetool6 --type Plasma/Applet --upgrade .
 
 Then add **DeepL Translator** from the Plasma widget picker.
 
+From a downloaded release package:
+
+```sh
+kpackagetool6 --type Plasma/Applet --install deepl-translator-plasmoid-1.0.0.plasmoid
+```
+
+To update an existing installation from a downloaded release package:
+
+```sh
+kpackagetool6 --type Plasma/Applet --upgrade deepl-translator-plasmoid-1.0.0.plasmoid
+```
+
+## Package
+
+Create a release package from a clean checkout:
+
+```sh
+mkdir -p dist
+git archive --format=zip --output=dist/deepl-translator-plasmoid-1.0.0.plasmoid HEAD
+```
+
+Upload `dist/deepl-translator-plasmoid-1.0.0.plasmoid` as a GitHub Release
+asset.
+
 ## Test
 
 ```sh
