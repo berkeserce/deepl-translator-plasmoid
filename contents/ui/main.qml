@@ -12,6 +12,7 @@ PlasmoidItem {
     property bool busy: false
     property string statusText: ""
     property string translatedText: ""
+    property string lastDetectedSourceLanguage: ""
     property var sourceLanguages: [{
         "text": i18n("Auto detect"),
         "value": ""
@@ -105,6 +106,49 @@ PlasmoidItem {
         return TranslationEngine.validateRequest(inputText.text, sourceLang.currentValue, targetLang.currentValue);
     }
 
+    function setComboValue(comboBox, value, fallbackIndex) {
+        const index = comboBox.indexOfValue(value || "");
+        comboBox.currentIndex = index >= 0 ? index : fallbackIndex;
+    }
+
+    function sourceValueForTarget(targetLanguage) {
+        const target = TranslationEngine.normalizeLanguage(targetLanguage);
+        const exactIndex = sourceLang.indexOfValue(target);
+        if (exactIndex >= 0)
+            return target;
+
+        const family = TranslationEngine.languageFamily(target);
+        return sourceLang.indexOfValue(family) >= 0 ? family : "";
+    }
+
+    function targetValueForSource(sourceLanguage) {
+        const source = TranslationEngine.normalizeLanguage(sourceLanguage);
+        const exactIndex = targetLang.indexOfValue(source);
+        if (exactIndex >= 0)
+            return source;
+
+        const family = TranslationEngine.languageFamily(source);
+        if (family === "EN")
+            return "EN-US";
+
+        return targetLang.indexOfValue(family) >= 0 ? family : targetLang.currentValue;
+    }
+
+    function swapLanguagesAndText(inputTextArea) {
+        const previousSource = sourceLang.currentValue;
+        const previousTarget = targetLang.currentValue;
+        const sourceForTarget = sourceValueForTarget(previousTarget);
+        const targetForSource = previousSource && previousSource.length > 0 ? targetValueForSource(previousSource) : targetValueForSource(lastDetectedSourceLanguage);
+        setComboValue(sourceLang, sourceForTarget, 0);
+        setComboValue(targetLang, targetForSource, root.languageIndex(targetLang, previousTarget, 0));
+        if (translatedText.length > 0) {
+            const previousInput = inputTextArea.text;
+            inputTextArea.text = translatedText;
+            translatedText = previousInput;
+        }
+        statusText = i18n("Swapped");
+    }
+
     function copyTranslation(textArea) {
         if (translatedText.length === 0)
             return ;
@@ -130,6 +174,7 @@ PlasmoidItem {
         busy = true;
         statusText = i18n("Translating...");
         translatedText = "";
+        lastDetectedSourceLanguage = "";
         const body = TranslationEngine.buildRequestBody(text, sourceLanguage, targetLanguage);
         const request = new XMLHttpRequest();
         request.open("POST", apiHost + "/v2/translate");
@@ -144,6 +189,7 @@ PlasmoidItem {
                 try {
                     const response = TranslationEngine.parseTranslateResponse(request.responseText);
                     translatedText = response.text;
+                    lastDetectedSourceLanguage = response.detectedSourceLanguage;
                     statusText = translatedText.length > 0 ? TranslationEngine.formatSuccessStatus(response, sourceLanguage, targetLanguage) : i18n("No translation returned.");
                 } catch (error) {
                     statusText = i18n("Could not read DeepL response.");
@@ -205,7 +251,7 @@ PlasmoidItem {
 
             GridLayout {
                 Layout.fillWidth: true
-                columns: 2
+                columns: 3
                 columnSpacing: Kirigami.Units.smallSpacing
 
                 ColumnLayout {
@@ -226,6 +272,16 @@ PlasmoidItem {
                         Component.onCompleted: currentIndex = root.languageIndex(sourceLang, plasmoid.configuration.sourceLang, 0)
                     }
 
+                }
+
+                QQC2.ToolButton {
+                    Layout.alignment: Qt.AlignHCenter | Qt.AlignBottom
+                    enabled: !root.busy && (inputText.text.length > 0 || root.translatedText.length > 0)
+                    icon.name: "view-refresh"
+                    onClicked: root.swapLanguagesAndText(inputText)
+                    QQC2.ToolTip.delay: Kirigami.Units.toolTipDelay
+                    QQC2.ToolTip.text: i18n("Swap languages and text")
+                    QQC2.ToolTip.visible: hovered
                 }
 
                 ColumnLayout {
@@ -253,7 +309,7 @@ PlasmoidItem {
             QQC2.Button {
                 Layout.alignment: Qt.AlignRight
                 text: root.busy ? i18n("Translating") : i18n("Translate")
-                enabled: !root.busy && inputText.text.trim().length > 0 && root.currentValidation().ok
+                enabled: !root.busy && inputText.text.trim().length > 0
                 icon.name: "run-build"
                 onClicked: root.translate(inputText.text, sourceLang.currentValue, targetLang.currentValue)
             }
