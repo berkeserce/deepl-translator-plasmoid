@@ -101,6 +101,10 @@ PlasmoidItem {
         return index >= 0 ? index : fallbackIndex;
     }
 
+    function currentValidation() {
+        return TranslationEngine.validateRequest(inputText.text, sourceLang.currentValue, targetLang.currentValue);
+    }
+
     function copyTranslation(textArea) {
         if (translatedText.length === 0)
             return ;
@@ -116,6 +120,11 @@ PlasmoidItem {
         const apiHost = plasmoid.configuration.apiHost || "https://api-free.deepl.com";
         if (!apiKey || apiKey.trim().length === 0) {
             statusText = i18n("Set your DeepL API key in the widget settings.");
+            return ;
+        }
+        const validation = TranslationEngine.validateRequest(text, sourceLanguage, targetLanguage);
+        if (!validation.ok) {
+            statusText = validation.message;
             return ;
         }
         busy = true;
@@ -177,7 +186,7 @@ PlasmoidItem {
         id: popup
 
         implicitWidth: Kirigami.Units.gridUnit * 24
-        implicitHeight: Kirigami.Units.gridUnit * 26
+        implicitHeight: Kirigami.Units.gridUnit * 27
 
         ColumnLayout {
             anchors.fill: parent
@@ -244,9 +253,17 @@ PlasmoidItem {
             QQC2.Button {
                 Layout.alignment: Qt.AlignRight
                 text: root.busy ? i18n("Translating") : i18n("Translate")
-                enabled: !root.busy && inputText.text.trim().length > 0
+                enabled: !root.busy && inputText.text.trim().length > 0 && root.currentValidation().ok
                 icon.name: "run-build"
                 onClicked: root.translate(inputText.text, sourceLang.currentValue, targetLang.currentValue)
+            }
+
+            PlasmaComponents.Label {
+                Layout.fillWidth: true
+                color: root.currentValidation().ok ? Kirigami.Theme.disabledTextColor : Kirigami.Theme.negativeTextColor
+                elide: Text.ElideRight
+                horizontalAlignment: Text.AlignRight
+                text: root.currentValidation().ok ? TranslationEngine.requestSizeText(inputText.text, sourceLang.currentValue, targetLang.currentValue) : root.currentValidation().message
             }
 
             QQC2.TextArea {

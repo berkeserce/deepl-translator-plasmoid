@@ -1,7 +1,15 @@
 .pragma library
 
+const REQUEST_BODY_LIMIT_BYTES = 128 * 1024;
+
 function normalizeLanguage(language) {
     return (language || "").trim().toUpperCase();
+}
+
+function languageFamily(language) {
+    const normalized = normalizeLanguage(language);
+    const separator = normalized.indexOf("-");
+    return separator >= 0 ? normalized.slice(0, separator) : normalized;
 }
 
 function buildRequestBody(text, sourceLanguage, targetLanguage) {
@@ -23,10 +31,40 @@ function requestBodyBytes(body) {
 }
 
 function validateRequest(text, sourceLanguage, targetLanguage) {
+    const source = normalizeLanguage(sourceLanguage);
+    const target = normalizeLanguage(targetLanguage) || "EN-US";
+    const body = buildRequestBody(text, source, target);
+    const bytes = requestBodyBytes(body);
+
+    if (source.length > 0 && languageFamily(source) === languageFamily(target)) {
+        return {
+            "ok": false,
+            "message": "Choose different source and target languages.",
+            "bytes": bytes,
+            "limitBytes": REQUEST_BODY_LIMIT_BYTES
+        };
+    }
+
+    if (bytes > REQUEST_BODY_LIMIT_BYTES) {
+        return {
+            "ok": false,
+            "message": "Text is too large for a single DeepL request.",
+            "bytes": bytes,
+            "limitBytes": REQUEST_BODY_LIMIT_BYTES
+        };
+    }
+
     return {
         "ok": true,
-        "message": ""
+        "message": "",
+        "bytes": bytes,
+        "limitBytes": REQUEST_BODY_LIMIT_BYTES
     };
+}
+
+function requestSizeText(text, sourceLanguage, targetLanguage) {
+    const validation = validateRequest(text, sourceLanguage, targetLanguage);
+    return formatBytes(validation.bytes) + " / " + formatBytes(validation.limitBytes);
 }
 
 function parseTranslateResponse(responseText) {
@@ -95,4 +133,9 @@ function responseMessage(responseText) {
     } catch (error) {
         return "";
     }
+}
+
+function formatBytes(bytes) {
+    const kibibytes = bytes / 1024;
+    return kibibytes.toFixed(kibibytes < 10 ? 1 : 0) + " KiB";
 }
