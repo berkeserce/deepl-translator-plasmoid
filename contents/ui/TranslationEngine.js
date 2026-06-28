@@ -42,7 +42,26 @@ function parseTranslateResponse(responseText) {
 }
 
 function formatDeepLError(status, responseText) {
-    return "DeepL error: " + status;
+    const detail = responseMessage(responseText);
+    let message = "";
+
+    if (status === 0) {
+        message = "Network error. Check your connection.";
+    } else if (status === 400) {
+        message = "DeepL rejected the request.";
+    } else if (status === 401 || status === 403) {
+        message = "DeepL authentication failed. Check your API key.";
+    } else if (status === 429) {
+        message = "Too many DeepL requests. Try again later.";
+    } else if (status === 456) {
+        message = "DeepL quota exceeded.";
+    } else if (status >= 500) {
+        message = "DeepL is temporarily unavailable.";
+    } else {
+        message = "DeepL error: " + status;
+    }
+
+    return detail.length > 0 ? message + " " + detail : message;
 }
 
 function utf8ByteLength(text) {
@@ -64,4 +83,16 @@ function utf8ByteLength(text) {
     }
 
     return bytes;
+}
+
+function responseMessage(responseText) {
+    if (!responseText || responseText.length === 0)
+        return "";
+
+    try {
+        const response = JSON.parse(responseText);
+        return response.message || response.detail || "";
+    } catch (error) {
+        return "";
+    }
 }

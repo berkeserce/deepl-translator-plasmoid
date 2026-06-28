@@ -145,7 +145,7 @@ PlasmoidItem {
         };
         request.onerror = function() {
             busy = false;
-            statusText = i18n("Network error.");
+            statusText = TranslationEngine.formatDeepLError(0, "");
         };
         request.send(JSON.stringify(body));
     }
