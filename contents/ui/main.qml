@@ -144,7 +144,7 @@ PlasmoidItem {
                 try {
                     const response = TranslationEngine.parseTranslateResponse(request.responseText);
                     translatedText = response.text;
-                    statusText = translatedText.length > 0 ? i18n("Done") : i18n("No translation returned.");
+                    statusText = translatedText.length > 0 ? TranslationEngine.formatSuccessStatus(response, sourceLanguage, targetLanguage) : i18n("No translation returned.");
                 } catch (error) {
                     statusText = i18n("Could not read DeepL response.");
                 }

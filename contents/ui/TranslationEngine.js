@@ -75,8 +75,21 @@ function parseTranslateResponse(responseText) {
     return {
         "text": translation.text || "",
         "detectedSourceLanguage": translation.detected_source_language || "",
-        "billedCharacters": translation.billed_characters || 0
+        "billedCharacters": translation.billed_characters !== undefined ? translation.billed_characters : response.billed_characters || 0
     };
+}
+
+function formatSuccessStatus(result, sourceLanguage, targetLanguage) {
+    const detectedSource = normalizeLanguage(result.detectedSourceLanguage);
+    const selectedSource = normalizeLanguage(sourceLanguage);
+    const source = detectedSource || selectedSource || "Auto";
+    const target = normalizeLanguage(targetLanguage) || "EN-US";
+    let status = "Done: " + source + " -> " + target;
+
+    if (result.billedCharacters > 0)
+        status += " · " + result.billedCharacters + " chars";
+
+    return status;
 }
 
 function formatDeepLError(status, responseText) {
