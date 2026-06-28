@@ -423,6 +423,13 @@ PlasmoidItem {
                 wrapMode: TextEdit.Wrap
                 placeholderText: i18n("Text to translate")
                 selectByMouse: true
+                Keys.onPressed: function(event) {
+                    if ((event.key === Qt.Key_Return || event.key === Qt.Key_Enter) && !(event.modifiers & Qt.ShiftModifier)) {
+                        event.accepted = true;
+                        if (!root.busy && inputText.text.trim().length > 0)
+                            root.translate(inputText.text, sourceLang.currentValue, targetLang.currentValue);
+                    }
+                }
             }
 
             RowLayout {
