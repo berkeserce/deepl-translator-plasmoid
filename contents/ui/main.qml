@@ -120,7 +120,7 @@ PlasmoidItem {
         return sourceLang.indexOfValue(family) >= 0 ? family : "";
     }
 
-    function targetValueForSourceOrFallback(sourceLanguage, fallbackTarget) {
+    function targetValueForSource(sourceLanguage) {
         const source = TranslationEngine.normalizeLanguage(sourceLanguage);
         if (targetLang.indexOfValue(source) >= 0)
             return source;
@@ -129,30 +129,40 @@ PlasmoidItem {
         if (family === "EN")
             return "EN-US";
 
-        return targetLang.indexOfValue(family) >= 0 ? family : fallbackTarget;
+        return targetLang.indexOfValue(family) >= 0 ? family : "";
     }
 
-    function safeSwapTargetForAutoDetect(previousTarget) {
-        const detected = targetValueForSourceOrFallback(lastDetectedSourceLanguage, "");
+    function fallbackTargetForAutoDetect(previousTarget) {
+        const previousTargetFamily = TranslationEngine.languageFamily(previousTarget);
+        return previousTargetFamily === "EN" ? "TR" : "EN-US";
+    }
+
+    function targetValueForAutoDetect(previousTarget, detectedSourceLanguage) {
+        const detected = targetValueForSource(detectedSourceLanguage);
         if (detected.length > 0)
             return detected;
 
-        return TranslationEngine.languageFamily(previousTarget) === "EN" ? "TR" : "EN-US";
+        return fallbackTargetForAutoDetect(previousTarget);
+    }
+
+    function swapStatus(sourceLanguage, targetLanguage) {
+        return i18n("Swapped: %1 -> %2", sourceLanguage.length > 0 ? sourceLanguage : i18n("Auto"), targetLanguage);
     }
 
     function swapLanguagesAndText(inputTextArea) {
         const previousSource = sourceLang.currentValue;
         const previousTarget = targetLang.currentValue;
+        const previousInput = inputTextArea.text;
+        const previousOutput = translatedText;
         const sourceForTarget = sourceValueForTarget(previousTarget);
-        const targetForSource = previousSource && previousSource.length > 0 ? targetValueForSourceOrFallback(previousSource, previousTarget) : safeSwapTargetForAutoDetect(previousTarget);
+        const targetForSource = previousSource && previousSource.length > 0 ? targetValueForSource(previousSource) : targetValueForAutoDetect(previousTarget, lastDetectedSourceLanguage);
         setComboValue(sourceLang, sourceForTarget, 0);
-        setComboValue(targetLang, targetForSource, root.languageIndex(targetLang, previousTarget, 0));
-        if (translatedText.length > 0) {
-            const previousInput = inputTextArea.text;
-            inputTextArea.text = translatedText;
+        setComboValue(targetLang, targetForSource, 0);
+        if (previousOutput.length > 0) {
+            inputTextArea.text = previousOutput;
             translatedText = previousInput;
         }
-        statusText = i18n("Swapped");
+        statusText = swapStatus(sourceLang.currentValue, targetLang.currentValue);
     }
 
     function copyTranslation(textArea) {
